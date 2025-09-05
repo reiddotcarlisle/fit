@@ -1,0 +1,14 @@
+# Binaries
+/bin/
+/build/
+/dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go build cache
+*.test
+**/.DS_Store
+**/Thumbs.db

@@ -8,7 +8,6 @@ require (
 	github.com/go-ctap/ctaphid v0.7.0
 	github.com/go-ctap/winhello v0.1.0
 	github.com/keys-pub/go-libfido2 v1.5.3
-	golang.org/x/term v0.34.0
 	honnef.co/go/tools v0.6.1
 )
 

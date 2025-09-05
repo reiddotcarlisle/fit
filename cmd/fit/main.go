@@ -10,11 +10,13 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"syscall"
 
 	"github.com/keys-pub/go-libfido2"
-	"golang.org/x/term"
 )
+
+// buildVersion is set at build time using -ldflags "-X main.buildVersion=...".
+// Defaults to "dev" when not overridden.
+var buildVersion = "dev"
 
 // main is the entry point for the CLI application.
 func main() {
@@ -39,6 +41,8 @@ func main() {
 		cmdReset(args)
 	case "info":
 		cmdInfo(args)
+	case "version":
+		fmt.Println(buildVersion)
 	default:
 		printUsage()
 	}
@@ -60,6 +64,7 @@ func printUsage() {
 	fmt.Println("  reset         Performs a factory reset on a FIDO2 device.")
 	fmt.Println("  info [--pin PIN] [--device N|--path PATH]")
 	fmt.Println("                Displays device information / non-destructive diagnostics.")
+	fmt.Println("  version        Prints build version (embedded via ldflags).")
 	fmt.Println("\nGlobal flags:")
 	fmt.Println("  --json          Output machine-readable JSON where applicable.")
 }
@@ -204,12 +209,12 @@ func cmdAuth(args []string) {
 
 	if hasFlag(args, "--json") {
 		out := map[string]any{
-			"backend":       "libfido2",
-			"rp":            rpID,
-			"credentialID":  hex.EncodeToString(assertion.CredentialID),
-			"signature":     hex.EncodeToString(assertion.Sig),
-			"challengeHex":  hex.EncodeToString(cdh),
-			"challengeB64":  base64.RawURLEncoding.EncodeToString(cdh),
+			"backend":      "libfido2",
+			"rp":           rpID,
+			"credentialID": hex.EncodeToString(assertion.CredentialID),
+			"signature":    hex.EncodeToString(assertion.Sig),
+			"challengeHex": hex.EncodeToString(cdh),
+			"challengeB64": base64.RawURLEncoding.EncodeToString(cdh),
 		}
 		if len(assertion.HMACSecret) > 0 {
 			out["hmacSecret"] = hex.EncodeToString(assertion.HMACSecret)
@@ -285,13 +290,13 @@ func cmdAddPasskey(args []string) {
 	}
 	if hasFlag(args, "--json") {
 		writeJSON(map[string]any{
-			"backend":       "libfido2",
-			"rp":            rpID,
-			"user":          userName,
-			"resident":      resident,
-			"credentialID":  hex.EncodeToString(att.CredentialID),
-			"challengeHex":  hex.EncodeToString(cdh),
-			"challengeB64":  base64.RawURLEncoding.EncodeToString(cdh),
+			"backend":      "libfido2",
+			"rp":           rpID,
+			"user":         userName,
+			"resident":     resident,
+			"credentialID": hex.EncodeToString(att.CredentialID),
+			"challengeHex": hex.EncodeToString(cdh),
+			"challengeB64": base64.RawURLEncoding.EncodeToString(cdh),
 		})
 	} else {
 		fmt.Println("Created passkey:")
@@ -342,10 +347,10 @@ func cmdInfo(args []string) {
 
 	if hasFlag(args, "--json") {
 		out := map[string]any{
-			"backend":   "libfido2",
-			"type":      typ,
-			"isFIDO2":   isF2,
-			"versions":  info.Versions,
+			"backend":    "libfido2",
+			"type":       typ,
+			"isFIDO2":    isF2,
+			"versions":   info.Versions,
 			"extensions": info.Extensions,
 		}
 		if hid != nil {
@@ -409,7 +414,9 @@ func cmdList(args []string) {
 			manu := strings.TrimSpace(loc.Manufacturer)
 			prod := strings.TrimSpace(loc.Product)
 			label := strings.TrimSpace(strings.Join([]string{manu, prod}, " "))
-			if label == "" { label = "Unknown device" }
+			if label == "" {
+				label = "Unknown device"
+			}
 			items = append(items, map[string]any{
 				"index": i,
 				"label": label,
@@ -466,42 +473,6 @@ func cmdReset(args []string) {
 
 // cmdChangePIN changes the PIN for a FIDO2 device.
 // removed interactive init and change-pin; use set-pin instead
-
-// getDevice lists available FIDO2 devices and prompts the user to select one.
-func getDevice() *libfido2.Device {
-	locs, err := libfido2.DeviceLocations()
-	if err != nil {
-		log.Fatalf("Failed to get device locations: %v", err)
-	}
-	if len(locs) == 0 {
-		log.Fatalf("No FIDO2 devices found.")
-	}
-
-	fmt.Println("Found FIDO2 devices:")
-	for i, loc := range locs {
-		// DeviceLocation exposes Manufacturer and Product (no Description field)
-		label := strings.TrimSpace(strings.Join([]string{loc.Manufacturer, loc.Product}, " "))
-		if label == "" {
-			label = "Unknown device"
-		}
-		fmt.Printf("  [%d] %s (Path: %s)\n", i, label, loc.Path)
-	}
-
-	fmt.Print("Select a device (enter number): ")
-	var index int
-	_, err = fmt.Scanln(&index)
-	if err != nil || index < 0 || index >= len(locs) {
-		log.Fatalf("Invalid selection: %v", err)
-	}
-
-	path := locs[index].Path
-	dev, err := libfido2.NewDevice(path)
-	if err != nil {
-		log.Fatalf("Failed to open device: %v", err)
-	}
-
-	return dev
-}
 
 // getDeviceWithArgs tries to select a device using optional args:
 //
@@ -629,22 +600,6 @@ func getIntFlag(args []string, name string) (int, bool) {
 		}
 	}
 	return 0, false
-}
-
-// readPassword reads a password from stdin without echoing.
-func readPassword() (string, error) {
-	bytePassword, err := term.ReadPassword(int(syscall.Stdin))
-	if err != nil {
-		return "", err
-	}
-	return string(bytePassword), nil
-}
-
-// supportsPIN checks DeviceInfo options for clientPin support.
-func supportsPIN(opts []libfido2.Option) bool {
-	// Deprecated: use clientPinStatus for accurate semantics
-	present, _ := clientPinStatus(opts)
-	return present
 }
 
 // clientPinStatus returns (present, set) for the clientPin option.

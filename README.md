@@ -1,5 +1,7 @@
 # fit — FIDO2 / WebAuthn CLIs
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+
 Two focused executables:
 
 - `fit` — Talks directly to USB/NFC/BLE security keys using `go-libfido2`.
@@ -154,6 +156,10 @@ bin/fit-hello delete-passkey --rp example.com --cred-index 0
 `fit` (hardware path) is powered by the excellent [libfido2](https://github.com/Yubico/libfido2) project from Yubico, accessed through the Go bindings at [github.com/keys-pub/go-libfido2](https://github.com/keys-pub/go-libfido2). Huge thanks to its maintainers and contributors for making high‑quality, interoperable FIDO2 tooling available.
 
 Windows Hello functionality uses the Windows WebAuthn API via community Go wrappers.
+
+## License
+
+Released under the MIT License. See [LICENSE](./LICENSE).
 
 ---
 Happy hacking.

@@ -37,8 +37,8 @@ func main() {
 		cmdSetPIN(args)
 	case "reset":
 		cmdReset(args)
-	case "test":
-		cmdTest(args)
+	case "info":
+		cmdInfo(args)
 	default:
 		printUsage()
 	}
@@ -58,8 +58,8 @@ func printUsage() {
 	fmt.Println("  set-pin --new NEW [--old OLD] [--device N|--path PATH]")
 	fmt.Println("                Sets the device PIN (initial if --old omitted, otherwise changes PIN).")
 	fmt.Println("  reset         Performs a factory reset on a FIDO2 device.")
-	fmt.Println("  test [--pin PIN] [--device N|--path PATH]")
-	fmt.Println("                Checks device info/non-destructive diagnostics.")
+	fmt.Println("  info [--pin PIN] [--device N|--path PATH]")
+	fmt.Println("                Displays device information / non-destructive diagnostics.")
 	fmt.Println("\nGlobal flags:")
 	fmt.Println("  --json          Output machine-readable JSON where applicable.")
 }
@@ -304,8 +304,8 @@ func cmdAddPasskey(args []string) {
 	}
 }
 
-// cmdTest runs a non-destructive diagnostic against the authenticator.
-func cmdTest(args []string) {
+// cmdInfo runs a non-destructive diagnostic against the authenticator.
+func cmdInfo(args []string) {
 	// Extract optional --pin from args (kept simple)
 	var pin string
 	for i := 0; i < len(args)-1; i++ {

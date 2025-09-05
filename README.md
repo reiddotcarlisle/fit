@@ -22,6 +22,10 @@ go build -o bin/fit ./cmd/fit
 go build -o bin/fit-hello ./cmd/fit-hello
 ```
 
+Notes:
+- The `bin/` directory and generated executables are git‑ignored; run the above build commands after cloning.
+- Only `fit` and `fit-hello` are required; any additional vendor helper binaries placed in `bin/` are optional and not referenced by this README.
+
 ## Command summary
 
 ### fit (hardware / libfido2)

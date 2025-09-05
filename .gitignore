@@ -8,6 +8,10 @@
 *.so
 *.dylib
 
+# Explicit entries (redundant with /bin/ + *.exe but kept for clarity)
+/bin/fit.exe
+/bin/fit-hello.exe
+
 # Go build cache
 *.test
 **/.DS_Store

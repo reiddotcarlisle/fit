@@ -19,15 +19,35 @@ Shared themes: list credentials/devices, diagnostics, create passkeys, perform a
 
 ## Build
 
+Quick builds:
+
+PowerShell (Windows):
+```pwsh
+scripts/build.ps1
+```
+
+Bash (macOS / Linux / WSL):
+```bash
+scripts/build.sh
+```
+
+Make (any platform with make):
+```bash
+make build
+```
+
+Manual (Windows example):
 ```pwsh
 go build -o bin/fit ./cmd/fit
 go build -o bin/fit-hello ./cmd/fit-hello
+Copy-Item lib/*.dll bin/
 ```
 
 Notes:
 
-- The `bin/` directory and generated executables are git‑ignored; run the above build commands after cloning.
-- Only `fit` and `fit-hello` are required; any additional vendor helper binaries placed in `bin/` are optional and not referenced by this README.
+- Runtime DLLs are versioned under `lib/` (so builds are reproducible). Build scripts automatically copy them to `bin/`.
+- The `bin/` directory and generated executables are git‑ignored; run the build + copy after cloning.
+- Only `fit` and `fit-hello` are required; any additional vendor helper binaries placed in `bin/` are optional.
 
 ## Command summary
 

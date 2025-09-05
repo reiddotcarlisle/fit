@@ -4,7 +4,9 @@
 /dist/
 *.exe
 *.exe~
+# Keep shared libs in version control under /lib; ignore DLLs elsewhere
 *.dll
+!lib/*.dll
 *.so
 *.dylib
 

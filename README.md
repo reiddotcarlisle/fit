@@ -1,6 +1,6 @@
 # fit — FIDO Integration Tool
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE) [![CI](https://github.com/reiddotcarlisle/fit/actions/workflows/ci.yml/badge.svg)](https://github.com/reiddotcarlisle/fit/actions/workflows/ci.yml)
 
 Two focused executables:
 
@@ -177,6 +177,67 @@ bin/fit-hello delete-passkey --rp example.com --cred-index 0
 | PIN mismatch                         | Wrong old PIN; retry count decreases. Use `fit info` to see remaining retries. |
 | No devices found                     | Use `bin/fit list`; ensure drivers and permissions.                            |
 | No credentials for RP                | Create one with `add-passkey` first.                                           |
+
+## Supply chain & module resolution safety
+
+The build scripts intentionally set a conservative default only when you haven't already defined `GOPROXY`:
+
+```
+GOPROXY=https://proxy.golang.org,direct
+```
+
+Why this is safe / preferred:
+
+- Uses the public checksum database (transparent log) to detect tampering.
+- Falls back to `direct` only if a module version isn't cached by the proxy (still checksum‑verified unless you disable it yourself).
+- Does not override a custom corporate proxy you may export beforehand.
+
+What we deliberately do NOT do:
+
+- We do not set `GONOSUMDB=*` (that would disable checksum DB verification and weaken supply chain guarantees).
+- We do not pin or force replace directives; module authenticity comes from `go.sum` + the Go checksum DB.
+
+If you need an air‑gapped build:
+
+1. Pre‑warm a module cache (`go mod download ./...`) on a connected machine.
+2. Copy `$GOMODCACHE` into the offline environment.
+3. Run the build with the same Go version (module hashes must match).
+
+For extra assurance consider:
+
+- Running `go mod verify` (part of `make verify`).
+- Adding `govulncheck` (already optional in build scripts) to CI failures policy once you curate acceptable advisories.
+- Generating an SBOM: `syft packages dir:. -o spdx-json=sbom.json` (not yet automated here).
+
+### Fixing "package unsafe (or fmt, etc.) is not in std" errors
+
+If you see build or `govulncheck` failures like:
+
+```
+package unsafe is not in std (C:\Users\...\go\pkg\mod\golang.org\toolchain@v0.0.1-go1.24.x...\src\unsafe)
+```
+
+Your environment is using a downloaded toolchain shim whose std library is corrupted / not recognized.
+
+Run:
+
+```pwsh
+scripts/doctor.ps1
+```
+
+Then apply remediation:
+
+1. Remove any manually-set `GOROOT` env var (let Go manage it).
+2. Reinstall / repair Go (official installer or `winget upgrade --id GoLang.Go`).
+3. Clear caches:
+	```pwsh
+	go clean -cache -modcache -testcache -fuzzcache
+	Remove-Item "$env:GOMODCACHE\golang.org\toolchain*" -Recurse -Force -ErrorAction SilentlyContinue
+	```
+4. (Optional) `go env -w GOTOOLCHAIN=local` to force the locally installed toolchain.
+5. Open a fresh shell, rerun `scripts/build.ps1`.
+
+Once a normal `go build` works, `govulncheck` will also succeed.
 
 ## Future ideas
 

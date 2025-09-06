@@ -15,8 +15,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-  # Module declares go 1.24.4; older toolchains (1.22/1.23) fail with 'package requires newer Go version'.
-  go: ['1.24']
+        # Module declares go 1.24.4; older toolchains (1.22/1.23) fail with 'package requires newer Go version'.
+        go: ['1.24']
     steps:
       - uses: actions/checkout@v4
       - name: Setup Go

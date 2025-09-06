@@ -32,8 +32,15 @@ jobs:
       - name: Install libfido2 (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew update
-          brew install libfido2
+          # Clear any stale Homebrew locks
+          rm -f /usr/local/var/homebrew/locks/* || true
+          brew update || true
+          # Install libfido2 and ensure OpenSSL 3.x compatibility
+          brew install libfido2 pkg-config || brew reinstall libfido2 pkg-config
+          # Set PKG_CONFIG_PATH for proper library discovery
+          echo "PKG_CONFIG_PATH=/opt/homebrew/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          echo "CGO_CPPFLAGS=-I/opt/homebrew/include" >> $GITHUB_ENV
+          echo "CGO_LDFLAGS=-L/opt/homebrew/lib" >> $GITHUB_ENV
       - name: Cache Go build
         uses: actions/cache@v4
         with:
@@ -75,6 +82,13 @@ jobs:
       - name: Install libfido2 (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew update
-          brew install libfido2
+          # Clear any stale Homebrew locks
+          rm -f /usr/local/var/homebrew/locks/* || true
+          brew update || true
+          # Install libfido2 and ensure OpenSSL 3.x compatibility
+          brew install libfido2 pkg-config || brew reinstall libfido2 pkg-config
+          # Set PKG_CONFIG_PATH for proper library discovery
+          echo "PKG_CONFIG_PATH=/opt/homebrew/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          echo "CGO_CPPFLAGS=-I/opt/homebrew/include" >> $GITHUB_ENV
+          echo "CGO_LDFLAGS=-L/opt/homebrew/lib" >> $GITHUB_ENV
       - run: make verify

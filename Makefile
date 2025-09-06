@@ -25,7 +25,13 @@ copy-libs:
 
 fmt-check:
 	@echo 'Checking formatting'
-	@test -z "$$(gofmt -l . | grep -v '^vendor/')" || (echo "Run: gofmt -w (files need formatting)"; gofmt -l . | grep -v '^vendor/'; exit 1)
+	@unformatted="$$(gofmt -l . | grep -v '^vendor/' || true)"; \
+	if [ -n "$$unformatted" ]; then \
+	  echo "Auto-formatting:"; echo "$$unformatted"; gofmt -w $$unformatted; \
+	  # Re-check after formatting
+	  still="$$(gofmt -l . | grep -v '^vendor/' || true)"; \
+	  if [ -n "$$still" ]; then echo "Formatting issues remain:"; echo "$$still"; exit 1; fi; \
+	else echo 'Formatting OK'; fi
 
 tidy-check:
 	@echo 'Checking go.mod/go.sum tidy state'

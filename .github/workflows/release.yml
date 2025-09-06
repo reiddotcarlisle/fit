@@ -1,0 +1,168 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Triggers on semantic version tags like v1.0.0, v2.1.3, etc.
+
+permissions:
+  contents: write  # Required to create releases and upload assets
+
+jobs:
+  build-release:
+    name: Build Release Binaries
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux builds (hardware CLI + Windows Hello stub)
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            binary-suffix: ''
+            artifact-name: 'fit-linux-amd64'
+          - os: ubuntu-latest
+            goos: linux
+            goarch: arm64
+            binary-suffix: ''
+            artifact-name: 'fit-linux-arm64'
+          # Windows builds (Windows Hello CLI + hardware stub)
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+            binary-suffix: '.exe'
+            artifact-name: 'fit-windows-amd64'
+          # macOS builds (stubs for both CLIs)
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+            binary-suffix: ''
+            artifact-name: 'fit-darwin-amd64'
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+            binary-suffix: ''
+            artifact-name: 'fit-darwin-arm64'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          check-latest: true
+
+      - name: Install libfido2 (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfido2-dev libudev-dev pkg-config
+
+      - name: Install libfido2 (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          # Clear any stale Homebrew locks
+          rm -f /usr/local/var/homebrew/locks/* || true
+          brew update || true
+          # Install libfido2 - not needed for stubs but may be needed for other dependencies
+          brew install libfido2 pkg-config || brew reinstall libfido2 pkg-config
+
+      - name: Get version from tag
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Build binaries
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir -p dist
+          # Build fit (hardware CLI)
+          go build -ldflags "-X 'main.buildVersion=$VERSION'" -o "dist/fit${{ matrix.binary-suffix }}" ./cmd/fit
+          # Build fit-hello (Windows Hello CLI)  
+          go build -ldflags "-X 'main.buildVersion=$VERSION'" -o "dist/fit-hello${{ matrix.binary-suffix }}" ./cmd/fit-hello
+        shell: bash
+
+      - name: Copy Windows DLLs
+        if: matrix.goos == 'windows'
+        run: |
+          if (Test-Path "lib/*.dll") {
+            Copy-Item lib/*.dll dist/
+          }
+        shell: pwsh
+
+      - name: Create archive
+        run: |
+          cd dist
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            7z a -tzip "../${{ matrix.artifact-name }}.zip" *
+          else
+            tar -czf "../${{ matrix.artifact-name }}.tar.gz" *
+          fi
+        shell: bash
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: ${{ matrix.artifact-name }}.*
+
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: build-release
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Get version from tag
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "## fit ${VERSION}" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "### Platform Support" >> $GITHUB_OUTPUT
+          echo "- **Linux**: Full hardware FIDO2 CLI support" >> $GITHUB_OUTPUT
+          echo "- **Windows**: Windows Hello CLI support (fit-hello)" >> $GITHUB_OUTPUT  
+          echo "- **macOS**: Stub binaries with platform guidance" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "### Downloads" >> $GITHUB_OUTPUT
+          echo "Choose the appropriate binary for your platform:" >> $GITHUB_OUTPUT
+          echo "- Linux: \`fit-linux-amd64.tar.gz\` or \`fit-linux-arm64.tar.gz\`" >> $GITHUB_OUTPUT
+          echo "- Windows: \`fit-windows-amd64.zip\`" >> $GITHUB_OUTPUT
+          echo "- macOS: \`fit-darwin-amd64.tar.gz\` or \`fit-darwin-arm64.tar.gz\`" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "### Usage" >> $GITHUB_OUTPUT
+          echo "- On Linux: Use \`fit\` for hardware FIDO2 operations" >> $GITHUB_OUTPUT
+          echo "- On Windows: Use \`fit-hello\` for Windows Hello operations" >> $GITHUB_OUTPUT
+          echo "- On macOS: See stub messages for development guidance" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Release ${{ steps.version.outputs.version }}
+          body: ${{ steps.notes.outputs.notes }}
+          draft: false
+          prerelease: false
+          files: |
+            artifacts/**/*.tar.gz
+            artifacts/**/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
